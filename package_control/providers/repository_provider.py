@@ -115,8 +115,9 @@ class RepositoryProvider():
         if self.repo_info is not None:
             return
 
+        self.cache = {}
         self.repo_info = self.fetch_location(self.repo)
-        for key in ['packages', 'dependencies']:
+        for key in ('packages', 'dependencies'):
             if key not in self.repo_info:
                 self.repo_info[key] = []
 
@@ -131,9 +132,7 @@ class RepositoryProvider():
         else:
             is_http = True
 
-        includes = self.repo_info.get('includes', [])
-        del self.repo_info['includes']
-        for include in includes:
+        for include in self.repo_info.pop('includes', []):
             if include.startswith('//'):
                 if scheme_match is not None:
                     include = scheme_match.group(1) + include
@@ -182,14 +181,12 @@ class RepositoryProvider():
             except ValueError as e:
                 fail(e)
 
-            if 'packages' not in self.repo_info:
-                fail('the "packages" JSON key is missing.')
-
             if isinstance(self.repo_info['packages'], dict):
                 fail('the "packages" key is an object, not an array. This indicates it is a channel not a repository.')
 
         except (DownloaderException, ProviderException) as e:
             self.failed_sources[self.repo] = e
+            self.cache['get_dependencies'] = {}
             self.cache['get_packages'] = {}
             return False
 
@@ -288,9 +285,6 @@ class RepositoryProvider():
 
         github_client = GitHubClient(self.settings)
         bitbucket_client = BitBucketClient(self.settings)
-
-        if self.schema_version.major < 3:
-            self.repo_info['dependencies'] = []
 
         output = {}
         for dependency in self.repo_info['dependencies']:
